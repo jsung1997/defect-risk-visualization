@@ -1,20 +1,29 @@
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def risk_heatmap(df_commits: pd.DataFrame, risk_scores: np.ndarray, out_path: str=None):
-    """Plot a heatmap: rows=modules, cols=commits (chronological), values=risk score (0-1)."""
-    # pivot to modules x commits (fill missing with nan, then 0)
+def risk_heatmap(df_commits: pd.DataFrame, value_col: str = "risk_score", out_path: str | None = None):
+    """
+    Plot a heatmap: rows=modules, cols=commits (chronological),
+    cell value = df[value_col] (e.g., 'risk_score').
+    """
     df = df_commits.copy()
-    df = df.sort_values(by=["module","commit_time"])
-    pivot = df.pivot_table(index="module", columns="commit_id", values=risk_scores, aggfunc="mean")
+
+    # Ensure chronological ordering per module if commit_time exists
+    if "commit_time" in df.columns:
+        df = df.sort_values(by=["module", "commit_time", "commit_id"])
+    else:
+        df = df.sort_values(by=["module", "commit_id"])
+
+    # Pivot expects a *column name* for values
+    pivot = df.pivot_table(index="module", columns="commit_id", values=value_col, aggfunc="mean")
     pivot = pivot.fillna(0.0)
-    plt.figure(figsize=(10,6))
+
+    plt.figure(figsize=(10, 6))
     plt.imshow(pivot.values, aspect="auto")
     plt.xticks(range(pivot.shape[1]), pivot.columns, rotation=90)
     plt.yticks(range(pivot.shape[0]), pivot.index)
-    plt.title("DRV: Module x Commit Risk Heatmap")
+    plt.title("DRV: Module × Commit Risk Heatmap")
     plt.xlabel("Commits")
     plt.ylabel("Modules")
     plt.colorbar(label="Risk")
@@ -23,13 +32,16 @@ def risk_heatmap(df_commits: pd.DataFrame, risk_scores: np.ndarray, out_path: st
         plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.show()
 
-def topk_bar(df_commits: pd.DataFrame, risk_scores: np.ndarray, k:int=10, out_path:str=None):
+def topk_bar(df_commits: pd.DataFrame, risk_scores: np.ndarray, k: int = 10, out_path: str | None = None):
     order = np.argsort(-risk_scores)[:k]
-    subset = df_commits.iloc[order][["commit_id","module"]].copy()
+    subset = df_commits.iloc[order][["commit_id", "module"]].copy()
     values = risk_scores[order]
-    plt.figure(figsize=(8,5))
+
+    plt.figure(figsize=(8, 5))
     plt.bar(range(k), values)
-    plt.xticks(range(k), [f"{r.commit_id}\n{r.module}" for _, r in subset.iterrows()], rotation=45, ha="right")
+
+    labels = [f"{r.commit_id}\n{r.module[:18]}" for _, r in subset.iterrows()]
+    plt.xticks(range(k), labels, rotation=45, ha="right")
     plt.ylabel("Risk")
     plt.title(f"Top-{k} Risky Commits/Modules")
     plt.tight_layout()
