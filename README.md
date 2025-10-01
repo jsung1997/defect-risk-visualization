@@ -1,7 +1,7 @@
 
-# DRV Project (Defect-Risk Visualization) — Minimal Reference Implementation
+# DRV Project (Defect-Risk Visualization)
 
-This is a **self-contained Python scaffold** for your DRV thesis project. It includes:
+This is a **self-contained Python scaffold** for DRV thesis project. It includes:
 - Synthetic dataset generation (commit-level with CK-like metrics)
 - Baseline models (metrics-only and fused semantic+metrics)
 - Ranking metrics (FPA, Recall@K, NDCG@K)
