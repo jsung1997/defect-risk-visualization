@@ -1,6 +1,27 @@
 
 # DRV Project (Defect-Risk Visualization)
 
+OVERVIEW
+
+DRV (Defect-Risk Visualization) is a framework that helps developers see and prioritize defect-prone code modules.
+It combines defect prediction models with interactive visualizations so teams can quickly identify which parts of the codebase are most risky.
+
+Objective
+
+-Integrate software defect prediction (metrics + semantic models) into a unified workflow.
+
+-Provide visual analytics (heatmaps, rankings, dashboards) to make predictions transparent and interpretable.
+
+-Support developers in prioritizing high-risk modules, rather than treating all code equally.
+
+-Deliver a practical tool that complements existing defect prediction research with developer-friendly insights.
+
+
+
+
+
+
+
 This is a **self-contained Python scaffold** for DRV thesis project. It includes:
 - Synthetic dataset generation (commit-level with CK-like metrics)
 - Baseline models (metrics-only and fused semantic+metrics)
