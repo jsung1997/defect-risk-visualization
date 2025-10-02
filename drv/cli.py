@@ -1,6 +1,9 @@
 import argparse, json
 import os, sys
 from pathlib import Path
+from drv.visualize import risk_heatmap, topk_bar, risk_trend
+import matplotlib.pyplot as plt
+
 
 import numpy as np
 import pandas as pd
