@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import joblib
 
-# Local baseline models (no internet)
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
@@ -13,24 +12,42 @@ from .features import build_feature_matrix, fuse_semantic_and_metrics
 
 @dataclass
 class DRVModels:
-    tfidf: TfidfVectorizer
-    clf_metrics: GradientBoostingClassifier
-    clf_fused: GradientBoostingClassifier
+    tfidf: TfidfVectorizer | None
+    clf_metrics: GradientBoostingClassifier | None
+    clf_fused: GradientBoostingClassifier | None
+
+def _safe_tfidf_fit(text_series: pd.Series) -> tuple[TfidfVectorizer | None, np.ndarray]:
+    """
+    Fit TF-IDF on commit messages.
+    If messages are empty or vocabulary can't be built, return (None, zeros).
+    """
+    msgs = text_series.fillna("").astype(str)
+    if (msgs.str.len() > 0).sum() == 0:
+        return None, np.zeros((len(msgs), 1), dtype=float)
+    tfidf = TfidfVectorizer(max_features=3000)
+    try:
+        X_text = tfidf.fit_transform(msgs).toarray()
+        return tfidf, X_text
+    except ValueError:
+        # empty vocabulary -> use zeros
+        return None, np.zeros((len(msgs), 1), dtype=float)
+
+def _safe_tfidf_transform(text_series: pd.Series, tfidf: TfidfVectorizer | None) -> np.ndarray:
+    if tfidf is None:
+        return np.zeros((len(text_series), 1), dtype=float)
+    return tfidf.transform(text_series.fillna("").astype(str)).toarray()
 
 def train_baselines(df: pd.DataFrame, seed: int = 42):
-    # Prepare features
+    # Metrics
     X_metrics = build_feature_matrix(df)
     y = df["label"].astype(int).values
 
-    # Semantic proxy (stand-in for BiCC embeddings): TF-IDF on commit messages
-    tfidf = TfidfVectorizer(max_features=3000)
-    X_text = tfidf.fit_transform(df["message"].fillna("")).toarray()
-
+    # Text (commit messages). May be unavailable/empty in apachejit_total -> handle safely.
+    tfidf, X_text = _safe_tfidf_fit(df["message"] if "message" in df.columns else pd.Series([""]*len(df)))
     X_fused = fuse_semantic_and_metrics(X_text, X_metrics)
 
+    # Train metrics-only
     Xtr_m, Xte_m, ytr, yte = train_test_split(X_metrics, y, test_size=0.2, random_state=seed, stratify=y)
-    Xtr_f, Xte_f, ytr_f, yte_f = train_test_split(X_fused, y, test_size=0.2, random_state=seed, stratify=y)
-
     clf_m = GradientBoostingClassifier(random_state=seed)
     clf_m.fit(Xtr_m, ytr)
     pred_m = clf_m.predict(Xte_m)
@@ -38,6 +55,8 @@ def train_baselines(df: pd.DataFrame, seed: int = 42):
     f1_m = f1_score(yte, pred_m)
     auc_m = roc_auc_score(yte, proba_m)
 
+    # Train fused (text+metrics). If text is zeros, this still works.
+    Xtr_f, Xte_f, ytr_f, yte_f = train_test_split(X_fused, y, test_size=0.2, random_state=seed, stratify=y)
     clf_f = GradientBoostingClassifier(random_state=seed)
     clf_f.fit(Xtr_f, ytr_f)
     pred_f = clf_f.predict(Xte_f)
@@ -50,10 +69,11 @@ def train_baselines(df: pd.DataFrame, seed: int = 42):
 
 def score_dataframe(df: pd.DataFrame, models: DRVModels):
     X_metrics = build_feature_matrix(df)
-    X_text = models.tfidf.transform(df["message"].fillna("")).toarray()
+    X_text = _safe_tfidf_transform(df["message"] if "message" in df.columns else pd.Series([""]*len(df)), models.tfidf)
     X_fused = fuse_semantic_and_metrics(X_text, X_metrics)
-    proba_m = models.clf_metrics.predict_proba(X_metrics)[:, 1]
-    proba_f = models.clf_fused.predict_proba(X_fused)[:, 1]
+
+    proba_m = models.clf_metrics.predict_proba(X_metrics)[:, 1] if models.clf_metrics else np.zeros(len(df))
+    proba_f = models.clf_fused.predict_proba(X_fused)[:, 1] if models.clf_fused else proba_m
     return proba_m, proba_f
 
 # ---------- Persistence ----------
