@@ -17,32 +17,25 @@ from drv.models import train_baselines, score_dataframe, save_models, load_model
 from drv.ranking import evaluate_ranking
 from drv.eval import threshold_scores, f1_auc, report
 
-REQUIRED_COLS = {"commit_id", "module", "message", "label"}
+REQUIRED_COLS = {"commit_id", "module", "label"}
 
 def _validate_and_sort(df: pd.DataFrame) -> pd.DataFrame:
-    # Standardize columns to what DRV expects
-    if "bug" in df.columns and "label" not in df.columns:
-        df["label"] = df["bug"]
-
-    if "project" in df.columns and "module" not in df.columns:
-        df["module"] = df["project"]
-
-    if "message" not in df.columns:
-        df["message"] = ""  # placeholder
-
-    # Now validate only required columns
-    required = {"commit_id", "module", "label"}
-    missing = required - set(df.columns)
+    # ensure required columns exist (after normalization in load_commits)
+    missing = REQUIRED_COLS - set(df.columns)
     if missing:
-        raise ValueError(f"Missing required columns: {sorted(missing)}")
+        raise ValueError(f"Missing required columns after normalization: {sorted(missing)}. "
+                         f"Got: {sorted(df.columns.tolist())}")
 
     df = df.copy()
     df["commit_id"] = df["commit_id"].astype(str)
+
+    # stable order for visuals
     if "commit_time" in df.columns:
         df = df.sort_values(["module", "commit_time", "commit_id"])
     else:
         df = df.sort_values(["module", "commit_id"])
     return df
+
 
 def main():
     ap = argparse.ArgumentParser(description="DRV: Defect-Risk Visualization CLI")
