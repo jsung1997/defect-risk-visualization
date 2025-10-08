@@ -20,9 +20,22 @@ from drv.eval import threshold_scores, f1_auc, report
 REQUIRED_COLS = {"commit_id", "module", "message", "label"}
 
 def _validate_and_sort(df: pd.DataFrame) -> pd.DataFrame:
-    missing = REQUIRED_COLS - set(df.columns)
+    # Standardize columns to what DRV expects
+    if "bug" in df.columns and "label" not in df.columns:
+        df["label"] = df["bug"]
+
+    if "project" in df.columns and "module" not in df.columns:
+        df["module"] = df["project"]
+
+    if "message" not in df.columns:
+        df["message"] = ""  # placeholder
+
+    # Now validate only required columns
+    required = {"commit_id", "module", "label"}
+    missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
+
     df = df.copy()
     df["commit_id"] = df["commit_id"].astype(str)
     if "commit_time" in df.columns:
