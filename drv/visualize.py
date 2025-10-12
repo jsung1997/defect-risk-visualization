@@ -60,6 +60,7 @@ def risk_heatmap_binned(
 
     x["bucket"] = x[time_col].dt.to_period(freq).dt.to_timestamp()
 
+    # Top-N hottest modules
     mod_mean = x.groupby(module_col, as_index=False)[value_col].mean()
     hot_mods = (
         mod_mean.sort_values(value_col, ascending=False)
@@ -68,14 +69,18 @@ def risk_heatmap_binned(
     )
     x = x[x[module_col].isin(hot_mods)]
 
+    # Pivot to module × bucket
     pivot = (
         x.groupby([module_col, "bucket"], as_index=False)[value_col]
          .mean()
          .pivot(index=module_col, columns="bucket", values=value_col)
     )
+
+    # Sort modules by global mean
     row_mean = pivot.mean(axis=1).sort_values(ascending=False)
     pivot = pivot.loc[row_mean.index]
 
+    # Color scaling (robust to outliers)
     if pivot.notna().values.any():
         q_low = float(np.nanquantile(pivot.values, clip_quantiles[0]))
         q_hi  = float(np.nanquantile(pivot.values, clip_quantiles[1]))
@@ -86,33 +91,43 @@ def risk_heatmap_binned(
     else:
         vmin, vmax = 0.0, 1.0
 
+    # Plot
     fig_h = max(6, 0.35 * len(pivot))
-    fig = plt.figure(figsize=(18, fig_h))
-    ax = sns.heatmap(
+    fig, ax = plt.subplots(figsize=(18, fig_h))
+    sns.heatmap(
         pivot,
-        cmap="Reds", vmin=vmin, vmax=vmax,
+        cmap="Reds",
+        vmin=vmin, vmax=vmax,
         linewidths=0.3, linecolor="#efefef",
         cbar_kws={"label": "Avg Risk" if value_col != "buggy" else "Bug Rate"},
+        ax=ax
     )
 
-    # Title & axis labels
+    # Titles & labels
     ax.set_title(f"DRV: Top-{max(1, topn)} Modules × {freq}-binned {value_col} Heatmap", fontsize=14, pad=20)
     ax.set_xlabel("Time", fontsize=12, labelpad=10)
     ax.set_ylabel("Modules", fontsize=12, labelpad=10)
 
-    # X tick formatting
-    ax.xaxis.set_major_locator(MaxNLocator(nbins=16))  # limit number of ticks
-    plt.xticks(rotation=30, ha="right", fontsize=9)
-    xlabels = [lbl.get_text().split("T")[0].split(" ")[0] for lbl in ax.get_xticklabels()]
-    if freq.upper() == "Y":
-        xlabels = [s[:4] for s in xlabels]
-    ax.set_xticklabels(xlabels)
+    # ----- Explicit, readable date ticks (guaranteed visible) -----
+    buckets = list(pivot.columns)
+    if len(buckets) > 0:
+        # Show ~10 evenly spaced ticks across the full range
+        step = max(1, len(buckets) // 10)
+        tick_idx = list(range(0, len(buckets), step))
+        tick_labels = [buckets[i].strftime("%Y-%m") for i in tick_idx]
 
-    # Y ticks smaller
+        ax.set_xticks(tick_idx)
+        ax.set_xticklabels(tick_labels, rotation=30, ha="right", fontsize=9)
+    else:
+        ax.set_xticks([])
+        ax.set_xticklabels([])
+    # ----------------------------------------------------------------
+
+    # Y labels
     plt.yticks(fontsize=9)
 
-    # Ensure labels are not clipped (no tight_layout here)
-    plt.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.22)
+    # Ensure labels are not clipped
+    plt.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.25)
 
     if out_path:
         fig.savefig(out_path, dpi=200, bbox_inches="tight")
