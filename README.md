@@ -55,7 +55,3 @@ Artifacts:
 - `drv/visualize.py` — heatmap & top-k plot
 - `drv/cli.py` — command-line workflow
 
-## Replace with Real Data/Models
-- Replace `data/commits.csv` with your JIT‑Defects4J export (same columns).
-- Swap TF‑IDF with your **BiCC‑BERT embeddings** in `models.py`.
-- Add dependency graph visualization to `visualize.py` if you have module graphs.
