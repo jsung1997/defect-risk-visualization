@@ -23,7 +23,7 @@ Objective
 
 
 This is a **self-contained Python scaffold** for DRV thesis project. It includes:
-- Synthetic dataset generation (commit-level with CK-like metrics)
+- ApacheJIT_Total Dataset
 - Baseline models (metrics-only and fused semantic+metrics)
 - Ranking metrics (FPA, Recall@K, NDCG@K)
 - Visualization (risk heatmap, Top-K bar chart)
