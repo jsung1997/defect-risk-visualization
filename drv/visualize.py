@@ -79,12 +79,15 @@ def risk_heatmap_binned(
     if pivot.notna().values.any():
         q_low = float(np.nanquantile(pivot.values, clip_quantiles[0]))
         q_hi  = float(np.nanquantile(pivot.values, clip_quantiles[1]))
-        vmin, vmax = (q_low, q_hi) if not np.isclose(q_low, q_hi) else (q_low - 1e-6, q_hi + 1e-6)
+        if np.isclose(q_low, q_hi):
+            vmin, vmax = q_low - 1e-6, q_hi + 1e-6
+        else:
+            vmin, vmax = q_low, q_hi
     else:
         vmin, vmax = 0.0, 1.0
 
     fig_h = max(6, 0.35 * len(pivot))
-    plt.figure(figsize=(18, fig_h))
+    fig = plt.figure(figsize=(18, fig_h))
     ax = sns.heatmap(
         pivot,
         cmap="Reds", vmin=vmin, vmax=vmax,
@@ -92,22 +95,29 @@ def risk_heatmap_binned(
         cbar_kws={"label": "Avg Risk" if value_col != "buggy" else "Bug Rate"},
     )
 
-    plt.title(f"DRV: Top-{max(1, topn)} Modules × {freq}-binned {value_col} Heatmap", fontsize=14, pad=20)
-    plt.xlabel("Time", fontsize=12)
-    plt.ylabel("Modules", fontsize=12)
+    # Title & axis labels
+    ax.set_title(f"DRV: Top-{max(1, topn)} Modules × {freq}-binned {value_col} Heatmap", fontsize=14, pad=20)
+    ax.set_xlabel("Time", fontsize=12, labelpad=10)
+    ax.set_ylabel("Modules", fontsize=12, labelpad=10)
 
-    ax.xaxis.set_major_locator(MaxNLocator(nbins=16))
+    # X tick formatting
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=16))  # limit number of ticks
     plt.xticks(rotation=30, ha="right", fontsize=9)
     xlabels = [lbl.get_text().split("T")[0].split(" ")[0] for lbl in ax.get_xticklabels()]
     if freq.upper() == "Y":
         xlabels = [s[:4] for s in xlabels]
     ax.set_xticklabels(xlabels)
+
+    # Y ticks smaller
     plt.yticks(fontsize=9)
 
-    plt.tight_layout()
+    # Ensure labels are not clipped (no tight_layout here)
+    plt.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.22)
+
     if out_path:
-        plt.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close()
+        fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
     return pivot
 
 
@@ -128,7 +138,7 @@ def topk_bar(
           .head(max(1, k))
     )
 
-    plt.figure(figsize=(10, max(4, 0.4 * len(df_bar))))
+    fig = plt.figure(figsize=(10, max(4, 0.4 * len(df_bar))))
     sns.barplot(
         data=df_bar,
         x="risk_score", y="module",
@@ -140,8 +150,8 @@ def topk_bar(
     plt.ylabel("Module")
     plt.tight_layout()
     if out_path:
-        plt.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close()
+        fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
 
 
 def risk_trend(
@@ -168,7 +178,7 @@ def risk_trend(
          .reset_index()
     )
 
-    plt.figure(figsize=(12, 4))
+    fig = plt.figure(figsize=(12, 4))
     plt.plot(ts["commit_time"], ts[value_col], linewidth=2)
     plt.title(f"Risk Trend (Rolling {window})", fontsize=13)
     plt.xlabel("Time"); plt.ylabel(f"Mean {value_col}")
@@ -177,5 +187,5 @@ def risk_trend(
     plt.xticks(rotation=30, ha="right", fontsize=9)
     plt.tight_layout()
     if out_path:
-        plt.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close()
+        fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
